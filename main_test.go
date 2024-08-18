@@ -74,7 +74,7 @@ func Test(t *testing.T) {
 						name: "Toussaint",
 						pieces: []piece{
 							{
-								location: "San Domingo",
+								location: "France",
 								name:     "Cavalry",
 							},
 							{
@@ -109,22 +109,35 @@ func Test(t *testing.T) {
 							},
 						},
 					},
+					{
+						name: "King George",
+						pieces: []piece{
+							{
+								location: "United States",
+								name:     "Infantry",
+							},
+							{
+								location: "Great Britain",
+								name:     "Infantry",
+							},
+						},
+					},
 				},
 				mv: move{
-					userName: "Toussaint",
+					userName: "King George",
 					piece: piece{
-						location: "United States",
-						name:     "Cavalry",
+						location: "France",
+						name:     "Infantry",
 					},
 				},
 				expectedFightLocations: []piece{
 					{
-						location: "United States",
+						location: "France",
 						name:     "Cavalry",
 					},
 					{
-						location: "United States",
-						name:     "Artillery",
+						location: "France",
+						name:     "Infantry",
 					},
 				},
 			},
@@ -144,8 +157,23 @@ func Test(t *testing.T) {
 		}
 		mover.march(test.mv.piece, bufferedCh)
 		close(bufferedCh)
-		output := doBattles(bufferedCh, test.users)
-		if !slices.Equal(output, test.expectedFightLocations) {
+
+		subChans := []chan move{}
+		for range test.users {
+			subChans = append(subChans, make(chan move, 100))
+		}
+		distributeBattles(bufferedCh, subChans)
+		for _, subChan := range subChans {
+			close(subChan)
+		}
+		battles := []piece{}
+		for i, u := range test.users {
+			subChan := subChans[i]
+			userBattles := u.doBattles(subChan)
+			battles = append(battles, userBattles...)
+		}
+
+		if !slices.Equal(battles, test.expectedFightLocations) {
 			t.Errorf(`
 Test Failed:
   users:
@@ -160,7 +188,7 @@ Test Failed:
 				formatSlice(test.users),
 				test.mv,
 				formatSlice(test.expectedFightLocations),
-				formatSlice(output),
+				formatSlice(battles),
 			)
 		} else {
 			fmt.Printf(`
@@ -177,7 +205,7 @@ Test Passed:
 				formatSlice(test.users),
 				test.mv,
 				formatSlice(test.expectedFightLocations),
-				formatSlice(output),
+				formatSlice(battles),
 			)
 		}
 	}

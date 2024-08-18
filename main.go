@@ -1,11 +1,16 @@
 package main
 
-func (u user) march(p piece, publishCh chan<- move) {
-	move := move{
-		userName: u.name,
-		piece: p,
+func (u user) doBattles(subCh <-chan move) []piece {
+	battlePieces := make([]piece, 0)
+	for move := range subCh {
+		userLocations := u.pieces 
+		for _, userLocation := range userLocations {
+			if move.piece.location == userLocation.location {
+				battlePieces = append(battlePieces, userLocation)
+			}
+		}
 	}
-	publishCh <- move
+	return battlePieces
 }
 
 // don't touch below this line
@@ -25,19 +30,17 @@ type piece struct {
 	name     string
 }
 
-func doBattles(publishCh <-chan move, users []user) []piece {
-	fights := []piece{}
+func (u user) march(p piece, publishCh chan<- move) {
+	publishCh <- move{
+		userName: u.name,
+		piece:    p,
+	}
+}
+
+func distributeBattles(publishCh <-chan move, subChans []chan move) {
 	for mv := range publishCh {
-		for _, u := range users {
-			if u.name == mv.userName {
-				continue
-			}
-			for _, piece := range u.pieces {
-				if piece.location == mv.piece.location {
-					fights = append(fights, piece)
-				}
-			}
+		for _, subCh := range subChans {
+			subCh <- mv
 		}
 	}
-	return fights
 }
